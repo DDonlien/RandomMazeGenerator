@@ -70,28 +70,42 @@ class Track:
 
     @classmethod
     def from_row(cls, row: Dict[str, str]) -> "Track":
-        """Create a track from a CSV row.
+        """Create a :class:`Track` from a CSV row.
 
-        The CSV file is expected to contain at least the following columns:
-
-        ``Name, SizeX, SizeY, SizeZ, Difficulty, Exits, [Type]``
-
-        *Exits* is a JSON string containing a list of dictionaries with the
-        keys ``direction``, ``position`` and ``rotations``.  Example:
-
-        ``[{"direction": "Y+", "position": [0,1,0], "rotations": [0,90]}]``
+        The cleaned ``rail_config.csv`` stores one exit per three columns,
+        ``Exit1Dir``, ``Exit1Pos`` and ``Exit1Rot`` (up to three exits).  Pos
+        values are comma separated coordinates and ``Rot`` may be either a
+        JSON array or a simple integer.  A ``Type`` column classifies special
+        rails such as start/end/checkpoint.
         """
 
         size = (int(row["SizeX"]), int(row["SizeY"]), int(row["SizeZ"]))
-        exits_json = json.loads(row["Exits"] or "[]")
-        exits = [
-            Exit(
-                direction=ex["direction"],
-                relative_pos=tuple(ex["position"]),
-                allowed_rotations=list(ex["rotations"]),
+        exits: List[Exit] = []
+        for i in range(1, 4):
+            dir_key = f"Exit{i}Dir"
+            dir_val = row.get(dir_key)
+            if not dir_val:
+                continue
+
+            pos_key = f"Exit{i}Pos"
+            pos_str = row.get(pos_key, "0,0,0")
+            pos = tuple(int(p.strip()) for p in pos_str.split(","))
+
+            rot_key = f"Exit{i}Rot"
+            rot_str = (row.get(rot_key) or "[0]").strip()
+            try:
+                rot_list = [int(r) for r in json.loads(rot_str)]
+            except json.JSONDecodeError:
+                rot_list = [int(r.strip()) for r in rot_str.strip("[]").split(",") if r.strip()]
+
+            exits.append(
+                Exit(
+                    direction=dir_val,
+                    relative_pos=pos,
+                    allowed_rotations=rot_list,
+                )
             )
-            for ex in exits_json
-        ]
+
         track_type = row.get("Type", "normal")
         return cls(
             name=row["Name"],
@@ -313,6 +327,15 @@ class MazeGenerator:
                         return
                     break
             if not success:
+                # As a last resort try to close the path with an end piece
+                if not any(pl.track.type == "end" for pl in self.placements):
+                    end_track = self.random.choice(self.by_type["end"])
+                    if self.can_place(end_track, next_pos):
+                        final_diff = end_track.difficulty * (1 + last_difficulty * 0.1)
+                        placement = Placement(end_track, next_pos, 0, final_diff)
+                        self.record_placement(placement)
+                        return
+
                 # backtrack: remove base exit to avoid infinite loop
                 open_exits.remove(base)
 
