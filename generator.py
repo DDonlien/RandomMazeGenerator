@@ -3,9 +3,9 @@
 
 This module reads track definitions from a CSV file and procedurally
 builds a maze layout.  The implementation follows the specification in
-`Requirement.md` shipped with the repository.  The script exposes a
-command line interface so it can be used as a standalone generator or as a
-library.
+`Requirement.md` shipped with the repository.  Parameters that used to be
+provided on the command line are stored as module level constants so they
+can be tweaked directly in this file.
 
 The actual placement algorithm tries to stay faithful to the rules but it
 is intentionally conservative so the script can run without external game
@@ -14,13 +14,24 @@ engine dependencies.
 
 from __future__ import annotations
 
-import argparse
 import csv
 import json
 import random
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
+
+
+# Configuration -------------------------------------------------------------
+
+CSV_PATH = Path("rail_config.csv")
+MIN_DIFFICULTY = 1
+MAX_DIFFICULTY = 3
+BUILD_SPACE_SIZE = 9
+SAFETY_ZONE_SIZE = 3
+CHECKPOINT_COUNT = 1
+SEED: Optional[int] = None
+OUTPUT_JSON = Path("maze_layout.json")
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -355,7 +366,7 @@ class MazeGenerator:
     # ------------------------------------------------------------------
 
     def export_json(self, path: Path) -> None:
-        """Export placements to a JSON file with world coordinates."""
+        """Export placements to a JSON file with world and maze coordinates."""
         data = []
         offset_z = self.world_offset_z(self.safety_zone_size)
         for pl in self.placements:
@@ -364,6 +375,7 @@ class MazeGenerator:
                 {
                     "name": pl.track.name,
                     "index": pl.track.index,
+                    "position_maze": pl.position,
                     "position_cm": (wx, wy, wz + offset_z * self.BLOCK_UNIT_IN_CM),
                     "rotation": pl.rotation,
                     "difficulty": pl.final_difficulty,
@@ -372,42 +384,58 @@ class MazeGenerator:
         path.write_text(json.dumps(data, indent=2), encoding="utf8")
 
 
-# ---------------------------------------------------------------------------
-# Command line interface
-# ---------------------------------------------------------------------------
+def validate(gen: "MazeGenerator") -> None:
+    """Run a series of sanity checks on ``gen.placements``.
 
+    This mirrors the lightweight validation that previously lived in
+    ``tester.py`` so that maze creation and verification happen in one
+    place.
+    """
 
-def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Procedural maze generator")
-    parser.add_argument("csv", type=Path, help="Path to track definition CSV")
-    parser.add_argument("min_difficulty", type=int, help="Minimum total difficulty")
-    parser.add_argument("max_difficulty", type=int, help="Maximum total difficulty")
-    parser.add_argument("build_size", type=int, help="Odd number for build space size")
-    parser.add_argument("safety_size", type=int, help="Odd number for safety zone size")
-    parser.add_argument("checkpoints", type=int, help="Number of checkpoints")
-    parser.add_argument("--seed", type=int, default=None, help="Random seed")
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=Path("maze_layout.json"),
-        help="Where to write the resulting layout JSON",
+    total_diff = sum(pl.final_difficulty for pl in gen.placements)
+    start_count = sum(1 for pl in gen.placements if pl.track.type == "start")
+    end_count = sum(1 for pl in gen.placements if pl.track.type == "end")
+    checkpoint_count = sum(
+        1 for pl in gen.placements if pl.track.type == "checkpoint"
     )
-    return parser.parse_args(argv)
+
+    assert start_count == 1, f"expected 1 start, got {start_count}"
+    assert end_count <= 1, f"expected at most 1 end, got {end_count}"
+    assert checkpoint_count <= gen.checkpoint_count, (
+        f"expected at most {gen.checkpoint_count} checkpoints, got {checkpoint_count}"
+    )
+    assert gen.min_difficulty <= total_diff <= gen.max_difficulty, (
+        f"total difficulty {total_diff} outside range {gen.min_difficulty}-{gen.max_difficulty}"
+    )
+
+    for pl in gen.placements:
+        x, y, z = pl.position
+        sx, sy, sz = pl.track.size
+        for dx in range(sx):
+            for dy in range(sy):
+                for dz in range(sz):
+                    cell = (x + dx, y + dy, z + dz)
+                    assert gen.is_in_bounds(cell), f"{pl.track.name} out of bounds"
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    args = parse_args(argv)
+# ---------------------------------------------------------------------------
+# Script entry point
+# ---------------------------------------------------------------------------
+
+
+def main() -> int:
     gen = MazeGenerator(
-        csv_path=args.csv,
-        difficulty_range=(args.min_difficulty, args.max_difficulty),
-        build_space_size=args.build_size,
-        safety_zone_size=args.safety_size,
-        checkpoint_count=args.checkpoints,
-        seed=args.seed,
+        csv_path=CSV_PATH,
+        difficulty_range=(MIN_DIFFICULTY, MAX_DIFFICULTY),
+        build_space_size=BUILD_SPACE_SIZE,
+        safety_zone_size=SAFETY_ZONE_SIZE,
+        checkpoint_count=CHECKPOINT_COUNT,
+        seed=SEED,
     )
     gen.generate()
-    gen.export_json(args.output)
-    print(f"Generated {len(gen.placements)} placements -> {args.output}")
+    validate(gen)
+    gen.export_json(OUTPUT_JSON)
+    print(f"Generated {len(gen.placements)} placements -> {OUTPUT_JSON}")
     return 0
 
 
