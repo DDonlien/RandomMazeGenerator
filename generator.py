@@ -68,6 +68,16 @@ class Exit:
         return mapping[self.direction]
 
 
+OPPOSITE_DIRECTIONS = {
+    "X+": "X-",
+    "X-": "X+",
+    "Y+": "Y-",
+    "Y-": "Y+",
+    "Z+": "Z-",
+    "Z-": "Z+",
+}
+
+
 @dataclass
 class Track:
     """Representation of a track module."""
@@ -293,6 +303,20 @@ class MazeGenerator:
                 for i in range(3)
             )
 
+            existing_pl = self.placement_map.get(next_pos)
+            if existing_pl is not None:
+                target_dir = OPPOSITE_DIRECTIONS[base_exit.direction]
+                for ex in existing_pl.track.exits:
+                    if ex.direction == target_dir:
+                        pair = (existing_pl, ex)
+                        if pair in open_exits:
+                            open_exits.remove(pair)
+                        open_exits.remove(base)
+                        break
+                else:
+                    open_exits.remove(base)
+                continue
+
             # decide track type depending on difficulty
             force_checkpoint = (
                 checkpoints_placed < self.checkpoint_count
@@ -328,7 +352,12 @@ class MazeGenerator:
                     last_difficulty = final_diff
                     current_total += final_diff
                     current_segment += final_diff
-                    open_exits.extend((placement, ex) for ex in track.exits)
+                    opposite = OPPOSITE_DIRECTIONS[base_exit.direction]
+                    open_exits.extend(
+                        (placement, ex)
+                        for ex in track.exits
+                        if ex.direction != opposite
+                    )
                     open_exits.remove(base)
                     success = True
                     if place_checkpoint and track in self.by_type["checkpoint"]:
