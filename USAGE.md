@@ -6,7 +6,7 @@
 
 根据 `rail_config.csv` 生成迷宫布局。
 
-```
+```bash
 python generator.py
 ```
 
@@ -18,7 +18,7 @@ python generator.py
 
 运行方式：
 
-```
+```bash
 python MazeGeneration.py
 ```
 
@@ -26,7 +26,7 @@ python MazeGeneration.py
 
 将 `generator.py` 生成的 `maze_layout.json` 渲染成简单的控制台表示，便于快速查看。
 
-```
+```bash
 python render_maze.py maze_layout.json
 ```
 
@@ -34,6 +34,6 @@ python render_maze.py maze_layout.json
 
 本仓库使用 `pytest` 进行单元测试。运行全部测试：
 
-```
+```bash
 pytest
 ```
