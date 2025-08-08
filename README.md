@@ -1,5 +1,88 @@
-# Random Maze Generator
+# 随机迷宫生成器 (Random Maze Generator)
 
-This repository contains documentation and requirements for a Python-based
-random maze generator capable of constructing 3D mazes for the game "迷宫球".
+这个仓库包含了一个基于Python的随机迷宫生成器，能够为3D物理迷宫游戏"迷宫球"构建复杂的3D迷宫。
+
+## 项目概述
+
+本项目实现了一个程序化的迷宫生成系统，具有以下特点：
+
+- **模块化设计**: 基于预定义的轨道模块构建迷宫
+- **智能算法**: 使用迭代生成算法，确保迷宫的连通性和可玩性
+- **难度控制**: 支持动态难度调整和检查点系统
+- **3D支持**: 完全支持三维迷宫生成
+- **可视化工具**: 提供ASCII渲染工具用于快速预览
+
+## 核心文件说明
+
+### `generator.py` - 核心生成器
+主要的迷宫生成脚本，包含：
+- 轨道数据加载和解析
+- 迷宫生成算法实现
+- 难度管理和检查点系统
+- JSON格式输出
+
+### `rail_config.csv` - 轨道配置
+包含所有可用轨道模块的定义，包括：
+- 轨道尺寸和类型
+- 出口方向和位置
+- 难度值和旋转选项
+
+### `render_maze.py` - 可视化工具
+将生成的迷宫布局渲染为ASCII字符图，便于快速预览。
+
+### `test_maze.py` - 测试脚本
+验证生成的迷宫是否符合设计要求。
+
+## 快速开始
+
+1. **生成迷宫**:
+   ```bash
+   python generator.py
+   ```
+
+2. **预览迷宫**:
+   ```bash
+   python render_maze.py
+   ```
+
+3. **运行测试**:
+   ```bash
+   python test_maze.py
+   ```
+
+## 配置参数
+
+在 `generator.py` 文件顶部可以调整以下参数：
+
+- `MIN_DIFFICULTY` / `MAX_DIFFICULTY`: 迷宫难度范围
+- `BUILD_SPACE_SIZE`: 建造空间尺寸
+- `SAFETY_ZONE_SIZE`: 安全区尺寸
+- `CHECKPOINT_COUNT`: 检查点数量
+- `SEED`: 随机种子（None表示随机）
+
+## 输出格式
+
+生成的迷宫以JSON格式保存，包含：
+- 轨道名称和索引
+- 迷宫坐标系位置
+- 世界坐标系位置（厘米）
+- 旋转角度
+- 最终难度值
+
+## 技术特性
+
+- **坐标系统**: 支持逻辑单元到世界坐标的转换
+- **碰撞检测**: 确保轨道不重叠
+- **回溯算法**: 处理生成失败的情况
+- **难度平衡**: 动态调整轨道难度
+- **类型分类**: 自动分类不同类型的轨道
+
+## 依赖要求
+
+- Python 3.7+
+- 标准库模块：csv, json, random, pathlib, dataclasses
+
+## 许可证
+
+本项目遵循开源许可证，详见LICENSE文件。
 
